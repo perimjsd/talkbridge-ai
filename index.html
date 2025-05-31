@@ -60,12 +60,23 @@
         const texto = event.results[0][0].transcript;
         document.getElementById("output").innerText = `🗣️ Você disse: "${texto}"`;
 
-        // Simula tradução e fala em inglês
         const synth = window.speechSynthesis;
-        const utter = new SpeechSynthesisUtterance();
-        utter.text = texto; // Em breve: colocar a tradução aqui
-        utter.lang = 'en-US'; // Voz em inglês
-        synth.speak(utter);
+        const utter = new SpeechSynthesisUtterance(texto);
+        utter.lang = 'en-US';
+
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
+          const enVoice = voices.find(v => v.lang === 'en-US') || voices[0];
+          utter.voice = enVoice;
+        }
+
+        utter.onstart = () => console.log("🔊 Voz iniciando...");
+        utter.onerror = (e) => console.error("Erro na voz:", e);
+
+        synth.cancel();
+        setTimeout(() => {
+          synth.speak(utter);
+        }, 100);
       };
 
       recognition.onerror = function (event) {
