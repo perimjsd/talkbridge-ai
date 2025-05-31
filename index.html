@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TalkBridge AI</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#007bff"/>
@@ -20,6 +20,7 @@
       color: white;
       font-size: 18px;
       padding: 15px 30px;
+      margin: 10px;
       border: none;
       border-radius: 8px;
       cursor: pointer;
@@ -28,62 +29,69 @@
     #output {
       margin-top: 20px;
       font-size: 20px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
   <h1>TalkBridge AI</h1>
-  <p>Toque no botão e fale em Português. O app traduzirá e falará em Inglês automaticamente.</p>
-  <button id="falar">🎤 Falar agora</button>
+  <p>Toque em "Gravar" para começar a falar. Depois clique em "Parar" para traduzir e ouvir.</p>
+  <button id="gravar">🎤 Gravar</button>
+  <button id="parar">⏹️ Parar</button>
   <div id="output"></div>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
+    let mediaRecorder;
+    let audioChunks = [];
 
-    document.getElementById("falar").addEventListener("click", function () {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert("Reconhecimento de voz não suportado.");
-        return;
-      }
+    document.getElementById("gravar").addEventListener("click", async () => {
+      const output = document.getElementById("output");
+      output.innerText = "⏺️ Gravando...";
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = "pt-BR";
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
 
-      recognition.onstart = function () {
-        document.getElementById("output").innerText = "🎙️ Ouvindo...";
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
       };
 
-      recognition.onresult = function (event) {
-        const texto = event.results[0][0].transcript;
-        document.getElementById("output").innerText = `🗣️ Você disse: "${texto}"`;
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'gravacao.webm');
 
-        const synth = window.speechSynthesis;
-        const utter = new SpeechSynthesisUtterance(texto);
-        utter.lang = 'en-US';
+        output.innerText = "🔄 Enviando áudio para o servidor...";
 
-        const voices = synth.getVoices();
-        if (voices.length > 0) {
-          const enVoice = voices.find(v => v.lang === 'en-US') || voices[0];
-          utter.voice = enVoice;
-        }
+        try {
+          const response = await fetch('http://localhost:3000/api/transcrever-traduzir', {
+            method: 'POST',
+            body: formData
+          });
 
-        utter.onstart = () => console.log("🔊 Voz iniciando...");
-        utter.onerror = (e) => console.error("Erro na voz:", e);
+          const result = await response.json();
+          output.innerText = "📝 Tradução: " + result.traducao;
 
-        synth.cancel();
-        setTimeout(() => {
+          const synth = window.speechSynthesis;
+          const utter = new SpeechSynthesisUtterance(result.traducao);
+          utter.lang = 'en-US';
+          synth.cancel();
           synth.speak(utter);
-        }, 100);
+        } catch (error) {
+          output.innerText = "❌ Erro ao enviar o áudio.";
+          console.error(error);
+        }
       };
 
-      recognition.onerror = function (event) {
-        document.getElementById("output").innerText = "❌ Erro: " + event.error;
-      };
+      mediaRecorder.start();
+    });
 
-      recognition.start();
+    document.getElementById("parar").addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        document.getElementById("output").innerText = "⏹️ Processando...";
+      }
     });
   </script>
 </body>
