@@ -33,7 +33,7 @@
 </head>
 <body>
   <h1>TalkBridge AI</h1>
-  <p>Toque no botão e fale em Português. O app traduzirá para Inglês automaticamente.</p>
+  <p>Toque no botão e fale em Português. O app traduzirá e falará em Inglês automaticamente.</p>
   <button id="falar">🎤 Falar agora</button>
   <div id="output"></div>
 
@@ -59,6 +59,13 @@
       recognition.onresult = function (event) {
         const texto = event.results[0][0].transcript;
         document.getElementById("output").innerText = `🗣️ Você disse: "${texto}"`;
+
+        // Simula tradução e fala em inglês
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance();
+        utter.text = texto; // Em breve: colocar a tradução aqui
+        utter.lang = 'en-US'; // Voz em inglês
+        synth.speak(utter);
       };
 
       recognition.onerror = function (event) {
